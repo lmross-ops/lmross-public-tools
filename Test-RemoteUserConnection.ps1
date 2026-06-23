@@ -45,19 +45,44 @@ $avgLatency = [math]::Round(($pingResults.AvgMs | Where-Object { $_ } | Measure-
 $avgLoss    = [math]::Round(($pingResults.Loss | Measure-Object -Average).Average, 0)
 
 
-# --- Rough download estimate (no dependencies) ---
+# --- Parallel download estimate (no dependencies) ---
 $dl = $null
 try {
     Write-Host "Estimating download speed..." -ForegroundColor Cyan
-    $sizeMB = 10
-    $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $null = Invoke-WebRequest -Uri "https://speed.cloudflare.com/__down?bytes=$($sizeMB * 1MB)" `
-        -UseBasicParsing -TimeoutSec 30
-    $sw.Stop()
-    $dl = [math]::Round(($sizeMB * 8) / $sw.Elapsed.TotalSeconds, 1)
+    $sizeMB  = 25
+    $streams = 4
+    $url     = "https://speed.cloudflare.com/__down?bytes=$($sizeMB * 1MB)"
+
+    $jobs = 1..$streams | ForEach-Object {
+        Start-Job -ScriptBlock {
+            param($u)
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            try {
+                $null = Invoke-WebRequest -Uri $u -UseBasicParsing -TimeoutSec 30
+                $sw.Stop()
+                return $sw.Elapsed.TotalSeconds
+            } catch {
+                return $null
+            }
+        } -ArgumentList $url
+    }
+
+    $times = $jobs | Wait-Job | Receive-Job
+    $jobs | Remove-Job
+
+    $validTimes = @($times | Where-Object { $_ -ne $null })
+    if ($validTimes.Count -eq 0) {
+        $dl = 0
+    } else {
+        # Total data downloaded / longest stream time (they run in parallel)
+        $totalMB = $sizeMB * $validTimes.Count
+        $elapsed = ($validTimes | Measure-Object -Maximum).Maximum
+        $dl = [math]::Round(($totalMB * 8) / $elapsed, 1)
+    }
 } catch {
     $dl = 0
 }
+
 
 
 # --- Verdict logic ---
