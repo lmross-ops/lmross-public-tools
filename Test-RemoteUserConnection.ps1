@@ -89,8 +89,7 @@ try {
 $problems = @()
 $verdict  = 'GOOD'
 
-# if ($avgLatency -gt 150)              { $problems += "High latency ($avgLatency ms) — expect lag in Teams/RDP/VoIP"; $verdict = 'BAD' }
-if ($avgLatency -gt 5)              { $problems += "High latency ($avgLatency ms) — expect lag in Teams/RDP/VoIP"; $verdict = 'BAD' }
+if ($avgLatency -gt 150)              { $problems += "High latency ($avgLatency ms) — expect lag in Teams/RDP/VoIP"; $verdict = 'BAD' }
 elseif ($avgLatency -gt 80)           { $problems += "Elevated latency ($avgLatency ms) — noticeable in calls"; $verdict = 'MARGINAL' }
 
 if ($avgLoss -gt 5)                   { $problems += "Packet loss at $avgLoss% — calls will drop and freeze"; $verdict = 'BAD' }
